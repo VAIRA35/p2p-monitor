@@ -6,7 +6,7 @@ from app.exchanges.binance import BinanceAdapter
 from app.analyzer import find_opportunities
 from app.terminal import render_ads, render_opportunities
 
-async def main():
+async def main(once: bool = False):
     with Path("config.yaml").open(encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
     pair = config.get("pair", {})
@@ -48,6 +48,8 @@ async def main():
             print("Press Ctrl+C to stop.")
         except Exception as exc:
             print(f"ERROR: {type(exc).__name__}: {exc}")
+        if once:
+            break
         await asyncio.sleep(max(0.0, interval))
 
 if __name__ == "__main__":
