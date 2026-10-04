@@ -15,7 +15,7 @@ exchanges:
 # Empty = both ads must share a common method (old behaviour).
 # Names are normalized: monobank, privatbank, pumb, a-bank, sense, raiffeisen,
 # oschadbank, izibank, ukrsibbank, otp, bank transfer ...
-my_payment_methods: []
+my_payment_methods: [monobank, privatbank]
 
 display:
   ads_per_side: 10
@@ -54,5 +54,5 @@ storage:
   snapshot_interval: 60   # seconds between best-price snapshots
 
 alerts:
-  telegram: false          # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
+  telegram: true           # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
   cooldown_seconds: 300    # don't repeat the same signal more often
