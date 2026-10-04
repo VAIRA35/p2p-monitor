@@ -9,7 +9,11 @@ exchanges:
   bybit: true
   okx: true
   rows: 20            # ads per side per exchange
-  min_interval: 1.0   # min seconds between requests to one exchange (rate-limit guard)
+  # Min seconds between requests to one exchange (rate-limit guard).
+  # OKX returns 429 at ~1 req/s; after a 429 the exchange is skipped for 30 s.
+  min_interval:
+    default: 1.0
+    okx: 3.0
 
 # Banks you actually have. Each leg must support one of them.
 # Empty = both ads must share a common method (old behaviour).
@@ -55,4 +59,6 @@ storage:
 
 alerts:
   telegram: true           # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
-  cooldown_seconds: 300    # don't repeat the same signal more often
+  # A signal is sent once when it appears. It is sent again only if it disappeared
+  # for longer than this and came back (persistent ads don't spam).
+  cooldown_seconds: 600

@@ -12,6 +12,7 @@ from app.alerts import TelegramNotifier
 from app.analyzer import find_opportunities
 from app.env import load_dotenv
 from app.exchanges import ADAPTERS
+from app.exchanges.base import RateLimited
 from app.http import DEFAULT_HEADERS
 from app.models import Advertisement
 from app.storage import Storage
@@ -27,6 +28,13 @@ def setup_logging(path: str) -> None:
     )
 
 
+def _interval_for(value, key: str) -> float:
+    """min_interval may be one number or a per-exchange mapping with an optional `default`."""
+    if isinstance(value, dict):
+        return float(value.get(key, value.get("default", 1.0)))
+    return float(value)
+
+
 async def fetch_all(adapters, asset: str, fiat: str) -> tuple[list[Advertisement], dict[str, str]]:
     """Fetch every exchange concurrently; one failing exchange doesn't stop the others."""
     results = await asyncio.gather(
@@ -34,9 +42,13 @@ async def fetch_all(adapters, asset: str, fiat: str) -> tuple[list[Advertisement
     )
     ads, statuses = [], {}
     for adapter, result in zip(adapters, results):
-        if isinstance(result, BaseException):
+        if isinstance(result, RateLimited):
+            statuses[adapter.name] = "COOLDOWN (429)"
+        elif isinstance(result, BaseException):
             statuses[adapter.name] = "OFFLINE"
-            log.error("%s fetch failed: %r", adapter.name, result)
+            # Short reason only: the full repr has request headers and cookies.
+            reason = getattr(result, "status", None) or result
+            log.error("%s fetch failed: %s %s", adapter.name, type(result).__name__, reason)
         else:
             statuses[adapter.name] = f"LIVE ({len(result)})"
             ads.extend(result)
@@ -68,7 +80,7 @@ async def main(once: bool = False):
     async with aiohttp.ClientSession(headers=DEFAULT_HEADERS) as session:
         adapters = [
             cls(session, rows=int(exchanges_cfg.get("rows", 20)),
-                min_interval=float(exchanges_cfg.get("min_interval", 1.0)))
+                min_interval=_interval_for(exchanges_cfg.get("min_interval", 1.0), key))
             for key, cls in ADAPTERS.items() if exchanges_cfg.get(key, False)
         ]
         if not adapters:

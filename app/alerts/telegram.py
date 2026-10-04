@@ -32,14 +32,16 @@ class TelegramNotifier:
         self.url = f"https://api.telegram.org/bot{token}/sendMessage"
         self.chat_id = chat_id
         self.cooldown = cooldown_seconds
-        self._sent: dict[tuple, float] = {}
+        self._last_seen: dict[tuple, float] = {}
 
     async def notify(self, items: list[ArbitrageOpportunity], fiat: str) -> int:
-        """Send signals not alerted within the cooldown; return how many were sent."""
+        """Send signals that are new or came back after a gap > cooldown; return count sent."""
         now = time.monotonic()
         sent = 0
         for x in items:
-            if now - self._sent.get(x.key, -self.cooldown) < self.cooldown:
+            last = self._last_seen.get(x.key)
+            self._last_seen[x.key] = now  # still present: refresh, don't resend
+            if last is not None and now - last < self.cooldown:
                 continue
             try:
                 await request_json(
@@ -49,7 +51,7 @@ class TelegramNotifier:
             except Exception as exc:
                 # Never log the URL: it contains the bot token.
                 log.error("Telegram send failed: %s", type(exc).__name__)
+                self._last_seen.pop(x.key, None)  # retry on the next tick
                 continue
-            self._sent[x.key] = now
             sent += 1
         return sent
