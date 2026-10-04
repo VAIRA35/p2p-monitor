@@ -1,34 +1,29 @@
 import asyncio
 from datetime import datetime, timezone
-import aiohttp
+
 from app.exchanges.base import ExchangeAdapter
+from app.http import request_json
 from app.models import Advertisement
+
 
 class BinanceAdapter(ExchangeAdapter):
     name = "BINANCE"
     URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
-    HEADERS = {
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/139 Safari/537.36",
-        "Accept": "application/json",
-    }
+    # Request tradeType is the USER's side: tradeType=BUY returns merchant SELL ads.
+    REQUEST_TYPE = {"SELL": "BUY", "BUY": "SELL"}
 
-    async def _fetch_side(self, session, asset, fiat, trade_type):
+    async def _fetch_side(self, asset: str, fiat: str, merchant_side: str) -> list[Advertisement]:
         payload = {
-            "asset": asset, "fiat": fiat, "page": 1, "rows": 20,
-            "tradeType": trade_type, "transAmount": "", "payTypes": [],
-            "publisherType": None,
+            "asset": asset, "fiat": fiat, "page": 1, "rows": self.rows,
+            "tradeType": self.REQUEST_TYPE[merchant_side], "transAmount": "",
+            "payTypes": [], "publisherType": None,
         }
-        async with session.post(self.URL, json=payload,
-                                timeout=aiohttp.ClientTimeout(total=10)) as response:
-            response.raise_for_status()
-            data = await response.json()
+        data = await request_json(self.session, "POST", self.URL, json=payload)
 
         result = []
-        for item in data.get("data", []):
+        for item in data.get("data") or []:
             adv = item.get("adv", {})
             advertiser = item.get("advertiser", {})
-            side = str(adv.get("tradeType", trade_type)).upper()
             payments = []
             for method in adv.get("tradeMethods", []):
                 name = (method.get("tradeMethodName")
@@ -42,7 +37,7 @@ class BinanceAdapter(ExchangeAdapter):
                 ad_id=str(adv.get("advNo", "")),
                 asset=adv.get("asset", asset),
                 fiat=adv.get("fiatUnit", fiat),
-                side=side,
+                side=str(adv.get("tradeType", merchant_side)).upper(),
                 price=float(adv.get("price", 0) or 0),
                 available=float(adv.get("tradableQuantity", 0) or 0),
                 min_amount=float(adv.get("minSingleTransAmount", 0) or 0),
@@ -57,23 +52,18 @@ class BinanceAdapter(ExchangeAdapter):
                 month_finish_rate=float(advertiser.get("monthFinishRate", 0) or 0),
                 positive_rate=float(advertiser.get("positiveRate", 0) or 0),
                 pay_time_limit=int(adv.get("payTimeLimit", 0) or 0),
+                remark=adv.get("remarks") or "",
                 updated_at=datetime.now(timezone.utc),
             ))
         return result
 
     async def get_ads(self, asset="USDT", fiat="UAH", side=None):
-        async with aiohttp.ClientSession(headers=self.HEADERS) as session:
-            if side:
-                requested = side.upper()
-                ads = await self._fetch_side(session, asset, fiat, requested)
-                return [ad for ad in ads if ad.side.upper() == requested]
-            buy_task = self._fetch_side(session, asset, fiat, "BUY")
-            sell_task = self._fetch_side(session, asset, fiat, "SELL")
-            buy_ads, sell_ads = await asyncio.gather(buy_task, sell_task)
-        return buy_ads + sell_ads
-
-    async def health_check(self):
-        try:
-            return isinstance(await self.get_ads("USDT", "UAH", "BUY"), list)
-        except Exception:
-            return False
+        if side:
+            requested = side.upper()
+            ads = await self._fetch_side(asset, fiat, requested)
+            return [ad for ad in ads if ad.side == requested]
+        sell_ads, buy_ads = await asyncio.gather(
+            self._fetch_side(asset, fiat, "SELL"),
+            self._fetch_side(asset, fiat, "BUY"),
+        )
+        return sell_ads + buy_ads

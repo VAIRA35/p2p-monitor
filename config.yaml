@@ -2,27 +2,57 @@ pair:
   asset: USDT
   fiat: UAH
 update_interval: 1.0
+log_file: p2p-monitor.log
+
 exchanges:
   binance: true
-  bybit: false
-  okx: false
+  bybit: true
+  okx: true
+  rows: 20            # ads per side per exchange
+  min_interval: 1.0   # min seconds between requests to one exchange (rate-limit guard)
+
+# Banks you actually have. Each leg must support one of them.
+# Empty = both ads must share a common method (old behaviour).
+# Names are normalized: monobank, privatbank, pumb, a-bank, sense, raiffeisen,
+# oschadbank, izibank, ukrsibbank, otp, bank transfer ...
+my_payment_methods: []
+
 display:
   ads_per_side: 10
   show_payment_methods: true
   show_merchant: true
+
 arbitrage:
   min_spread_percent: 0.5
   buy_fee_percent: 0.0
   sell_fee_percent: 0.0
   min_net_profit_percent: 0.5
   max_opportunities: 10
+  same_exchange: true
+  cross_exchange: true
+  # USDT lost moving funds between exchanges (withdrawal + network fee).
+  # CHECK current withdrawal fees on the exchanges — they change.
+  transfer_fee_usdt: 1.0
+
 arbitrage_filters:
   min_finish_rate: 0.90
   min_order_count: 50
+  max_pay_time_minutes: 60   # 0 = no limit
+
 signals:
   min_score: 80
   min_net_profit_percent: 2.0
   min_volume_uah: 10000
   alert_only: false
+
 realistic:
   safety_buffer_percent: 0.50
+
+storage:
+  enabled: true
+  path: p2p.db
+  snapshot_interval: 60   # seconds between best-price snapshots
+
+alerts:
+  telegram: false          # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
+  cooldown_seconds: 300    # don't repeat the same signal more often
