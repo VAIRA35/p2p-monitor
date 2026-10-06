@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 def format_signal(x: ArbitrageOpportunity, fiat: str) -> str:
     return "\n".join([
-        f"🟢 +{fmt.money(x.realistic_profit, fiat)} ({x.realistic_profit_percent:.1f}%) {fmt.route(x)}",
+        f"🟢 +{fmt.money(x.realistic_profit, fiat)} ({x.capital_percent:.1f}%) {fmt.route(x)}",
         f"{x.buy.price:.2f} → {x.sell.price:.2f} · {fmt.money(x.amount, fiat)} · {fmt.payment_route(x)}",
         f"⏱ {x.lockup_minutes} мин · ⭐ {x.score:.0f}",
     ])

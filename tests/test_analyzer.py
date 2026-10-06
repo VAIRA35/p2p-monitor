@@ -99,3 +99,27 @@ def test_passes_filters_my_banks():
     a = make("SELL", 44, "s", ["PUMB"])
     assert passes_filters(a)
     assert not passes_filters(a, my_payment_methods=["monobank"])
+
+
+def test_capital_caps_volume_and_percent():
+    ads = [make("SELL", 44, "s", ["Monobank"], available=1000, max_amount=44000),
+           make("BUY", 45, "b", ["Monobank"])]
+    x = find_opportunities(ads, capital=10000, safety_buffer_percent=0)[0]
+    assert x.amount == pytest.approx(10000)
+    assert x.capital_percent == pytest.approx(x.realistic_profit / 10000 * 100)
+
+
+def test_ad_minimum_above_capital_skipped():
+    ads = [make("SELL", 44, "s", ["Monobank"], min_amount=20000),
+           make("BUY", 45, "b", ["Monobank"])]
+    assert not find_opportunities(ads, capital=10000)
+
+
+def test_sorted_by_money():
+    ads = [make("SELL", 44, "small", ["Monobank"], max_amount=5000),
+           make("BUY", 46, "b1", ["Monobank"]),
+           make("SELL", 44.5, "big", ["Monobank"], max_amount=40000),
+           make("BUY", 45.5, "b2", ["Monobank"])]
+    result = find_opportunities(ads, min_net_profit_percent=0)
+    assert [r.realistic_profit for r in result] == sorted(
+        [r.realistic_profit for r in result], reverse=True)

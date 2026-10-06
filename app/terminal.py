@@ -24,11 +24,13 @@ def render(ads: list[Advertisement], statuses: dict[str, str],
     out.append(" " + "  ".join(_status(n, s) for n, s in statuses.items()))
     out.append(LINE)
 
-    out.append(f" СДЕЛКИ ({len(signals)})")
+    capital = signals[0].capital if signals else 0
+    note = f" · % от капитала {fmt.money(capital, fiat)}" if capital else ""
+    out.append(f" СДЕЛКИ ({len(signals)}){note}")
     if not signals:
         out.append("\n   Сейчас подходящих сделок нет.")
     for i, x in enumerate(signals[:max_signals], 1):
-        profit = f"+{fmt.money(x.realistic_profit, fiat)}  ({x.realistic_profit_percent:.1f}%)"
+        profit = f"+{fmt.money(x.realistic_profit, fiat)}  ({x.capital_percent:.1f}%)"
         head = f" #{i}  {fmt.route(x)}"
         out.append("")
         out.append(head + profit.rjust(46 - len(head)))

@@ -15,6 +15,10 @@ exchanges:
     default: 1.0
     okx: 3.0
 
+# Your working capital in UAH. Deals are capped to it, ads with a bigger minimum are skipped,
+# and the % next to profit = profit of one deal / this capital. 0 = no cap.
+capital: 20000
+
 # Banks you actually have. Each leg must support one of them.
 # Empty = both ads must share a common method (old behaviour).
 # Names are normalized: monobank, privatbank, pumb, a-bank, sense, raiffeisen,

@@ -71,6 +71,10 @@ async def main(once: bool = False):
     exchanges_cfg = config.get("exchanges", {})
     storage_cfg = config.get("storage", {})
     alerts_cfg = config.get("alerts", {})
+    capital = float(config.get("capital", 0) or 0)
+    min_volume = float(signals.get("min_volume_uah", 10000))
+    if capital:
+        min_volume = min(min_volume, capital)  # can't require more than we have
 
     storage = Storage(storage_cfg.get("path", "p2p.db")) if storage_cfg.get("enabled") else None
     snapshot_every = float(storage_cfg.get("snapshot_interval", 60))
@@ -119,12 +123,13 @@ async def main(once: bool = False):
                         cross_exchange=bool(arb.get("cross_exchange", True)),
                         transfer_fee_usdt=float(arb.get("transfer_fee_usdt", 0.0)),
                         max_pay_time_minutes=int(filters.get("max_pay_time_minutes", 0)),
+                        capital=capital,
                     )
                     signals_found = [
                         x for x in opportunities
                         if x.score >= float(signals.get("min_score", 80))
                         and x.realistic_profit_percent >= float(signals.get("min_net_profit_percent", 2.0))
-                        and x.amount >= float(signals.get("min_volume_uah", 10000))
+                        and x.amount >= min_volume
                     ]
 
                     if storage:

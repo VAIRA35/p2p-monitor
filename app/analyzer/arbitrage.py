@@ -25,10 +25,16 @@ class ArbitrageOpportunity:
     transfer_fee_usdt: float = 0.0
     buy_payment_methods: list[str] = field(default_factory=list)   # how we pay
     sell_payment_methods: list[str] = field(default_factory=list)  # how we get paid
+    capital: float = 0.0  # our working capital in fiat (0 = not set)
 
     @property
     def key(self) -> tuple[str, str, str, str]:
         return (self.buy.exchange, self.buy.ad_id, self.sell.exchange, self.sell.ad_id)
+
+    @property
+    def capital_percent(self) -> float:
+        """Profit of this one deal relative to our whole capital."""
+        return self.realistic_profit / self.capital * 100 if self.capital else self.realistic_profit_percent
 
     @property
     def lockup_minutes(self) -> int:
@@ -71,7 +77,7 @@ def find_opportunities(
     max_opportunities=10, min_finish_rate=0.90,
     min_order_count=50, safety_buffer_percent=0.50,
     my_payment_methods=None, same_exchange=True, cross_exchange=True,
-    transfer_fee_usdt=0.0, max_pay_time_minutes=0, unique_ads=True,
+    transfer_fee_usdt=0.0, max_pay_time_minutes=0, unique_ads=True, capital=0.0,
 ):
     """Pair buy and sell ads into opportunities.
 
@@ -80,6 +86,8 @@ def find_opportunities(
     transfer_fee_usdt: USDT lost moving funds between exchanges (cross-exchange pairs only).
     max_pay_time_minutes: skip ads with a longer pay time limit (0 = no limit).
     unique_ads: each ad is used in at most one opportunity (one merchant can't fill five deals).
+    capital: fiat we have; caps the deal size, ads with a higher minimum are skipped (0 = no cap).
+    Result is sorted by realistic profit in money, biggest first.
     """
     mine = normalize_payments(my_payment_methods or [])
 
@@ -115,6 +123,8 @@ def find_opportunities(
                 buy.available, buy.max_amount / buy.price,
                 sell.available + fee_usdt, sell.max_amount / sell.price + fee_usdt,
             )
+            if capital:
+                usdt = min(usdt, capital / buy.price)
             usdt_to_sell = usdt - fee_usdt
             if usdt_to_sell <= 0:
                 continue
@@ -153,9 +163,11 @@ def find_opportunities(
                 transfer_fee_usdt=fee_usdt,
                 buy_payment_methods=sorted(buy_via),
                 sell_payment_methods=sorted(sell_via),
+                capital=capital,
             ))
 
-    result.sort(key=lambda x: (x.score, x.realistic_profit), reverse=True)
+    # Most money first; the best deal claims its ads before smaller ones (unique_ads).
+    result.sort(key=lambda x: (x.realistic_profit, x.score), reverse=True)
     unique, seen, used_ads = [], set(), set()
     for item in result:
         buy_ad, sell_ad = item.key[:2], item.key[2:]
