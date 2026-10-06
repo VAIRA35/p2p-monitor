@@ -85,3 +85,17 @@ def test_faster_pay_time_scores_higher():
     slow = find_opportunities([make("SELL", 44, "s", ["Monobank"], pay_time=90),
                                make("BUY", 45, "b", ["Monobank"], pay_time=90)])[0]
     assert fast.score > slow.score
+
+
+def test_each_ad_used_once():
+    ads = [make("SELL", 44, "s1", ["Monobank"]), make("SELL", 44.1, "s2", ["Monobank"]),
+           make("BUY", 45, "b", ["Monobank"])]
+    assert len(find_opportunities(ads)) == 1
+    assert len(find_opportunities(ads, unique_ads=False)) == 2
+
+
+def test_passes_filters_my_banks():
+    from app.analyzer import passes_filters
+    a = make("SELL", 44, "s", ["PUMB"])
+    assert passes_filters(a)
+    assert not passes_filters(a, my_payment_methods=["monobank"])

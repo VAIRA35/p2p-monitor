@@ -22,9 +22,7 @@ exchanges:
 my_payment_methods: [monobank, privatbank]
 
 display:
-  ads_per_side: 10
-  show_payment_methods: true
-  show_merchant: true
+  max_signals: 5   # deals shown in the terminal
 
 arbitrage:
   min_spread_percent: 0.5

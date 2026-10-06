@@ -37,3 +37,11 @@ def test_persistent_signal_sent_once(monkeypatch):
 
     asyncio.run(run())
     assert len(calls) == 2
+
+
+def test_format_signal_three_lines():
+    text = telegram.format_signal(_signal()[0], "UAH")
+    lines = text.splitlines()
+    assert len(lines) == 3
+    assert lines[0].startswith("🟢 +") and "₴" in lines[0]
+    assert "Моно" in lines[1]

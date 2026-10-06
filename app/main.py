@@ -2,21 +2,20 @@ import asyncio
 import logging
 import os
 import time
-from datetime import datetime
 from pathlib import Path
 
 import aiohttp
 import yaml
 
 from app.alerts import TelegramNotifier
-from app.analyzer import find_opportunities
+from app.analyzer import find_opportunities, passes_filters
 from app.env import load_dotenv
 from app.exchanges import ADAPTERS
 from app.exchanges.base import RateLimited
 from app.http import DEFAULT_HEADERS
 from app.models import Advertisement
 from app.storage import Storage
-from app.terminal import render_ads, render_header, render_opportunities, render_status
+from app.terminal import render
 
 log = logging.getLogger("p2p")
 
@@ -105,9 +104,6 @@ async def main(once: bool = False):
                 started = time.monotonic()
                 try:
                     ads, statuses = await fetch_all(adapters, asset, fiat)
-                    render_header(asset, fiat)
-                    render_status(statuses)
-                    render_ads(ads, asset, fiat, int(display.get("ads_per_side", 10)))
                     opportunities = find_opportunities(
                         ads,
                         min_spread_percent=float(arb.get("min_spread_percent", 0.5)),
@@ -130,7 +126,6 @@ async def main(once: bool = False):
                         and x.realistic_profit_percent >= float(signals.get("min_net_profit_percent", 2.0))
                         and x.amount >= float(signals.get("min_volume_uah", 10000))
                     ]
-                    render_opportunities(signals_found, fiat)
 
                     if storage:
                         new = storage.save_signals(signals_found)
@@ -143,10 +138,13 @@ async def main(once: bool = False):
                     if notifier and signals_found:
                         await notifier.notify(signals_found, fiat)
 
-                    elapsed = time.monotonic() - started
-                    print(f"\nUpdated: {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-                    print(f"Request time: {elapsed:.3f}s")
-                    print("Press Ctrl+C to stop.")
+                    usable = [a for a in ads if passes_filters(
+                        a, float(filters.get("min_finish_rate", 0.90)),
+                        int(filters.get("min_order_count", 50)),
+                        int(filters.get("max_pay_time_minutes", 0)),
+                        config.get("my_payment_methods") or [])]
+                    render(usable, statuses, signals_found, asset, fiat,
+                           int(display.get("max_signals", 5)), time.monotonic() - started)
                 except Exception as exc:
                     log.exception("update failed")
                     print(f"ERROR: {type(exc).__name__}: {exc}")

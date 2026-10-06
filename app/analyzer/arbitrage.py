@@ -54,13 +54,24 @@ def _score(buy, sell, profit_pct, amount):
     return round(min(profit + finish + liquidity + history + _speed_score(buy, sell), 100), 1)
 
 
+def passes_filters(a: Advertisement, min_finish_rate=0.90, min_order_count=50,
+                   max_pay_time_minutes=0, my_payment_methods=None) -> bool:
+    """Ad quality filter; with my_payment_methods also requires one of our banks."""
+    mine = normalize_payments(my_payment_methods or [])
+    return (a.price > 0
+            and a.month_finish_rate >= min_finish_rate
+            and a.month_order_count >= min_order_count
+            and (not max_pay_time_minutes or a.pay_time_limit <= max_pay_time_minutes)
+            and (not mine or bool(a.payment_keys & mine)))
+
+
 def find_opportunities(
     ads, min_spread_percent=0.5, buy_fee_percent=0.0,
     sell_fee_percent=0.0, min_net_profit_percent=0.5,
     max_opportunities=10, min_finish_rate=0.90,
     min_order_count=50, safety_buffer_percent=0.50,
     my_payment_methods=None, same_exchange=True, cross_exchange=True,
-    transfer_fee_usdt=0.0, max_pay_time_minutes=0,
+    transfer_fee_usdt=0.0, max_pay_time_minutes=0, unique_ads=True,
 ):
     """Pair buy and sell ads into opportunities.
 
@@ -68,14 +79,12 @@ def find_opportunities(
     otherwise both ads must share a common method (old behaviour).
     transfer_fee_usdt: USDT lost moving funds between exchanges (cross-exchange pairs only).
     max_pay_time_minutes: skip ads with a longer pay time limit (0 = no limit).
+    unique_ads: each ad is used in at most one opportunity (one merchant can't fill five deals).
     """
     mine = normalize_payments(my_payment_methods or [])
 
     def eligible(a: Advertisement) -> bool:
-        return (a.price > 0
-                and a.month_finish_rate >= min_finish_rate
-                and a.month_order_count >= min_order_count
-                and (not max_pay_time_minutes or a.pay_time_limit <= max_pay_time_minutes))
+        return passes_filters(a, min_finish_rate, min_order_count, max_pay_time_minutes)
 
     # Merchant SELL = we buy USDT; merchant BUY = we sell USDT.
     buy_ads = [a for a in ads if a.is_sell() and eligible(a)]
@@ -147,11 +156,13 @@ def find_opportunities(
             ))
 
     result.sort(key=lambda x: (x.score, x.realistic_profit), reverse=True)
-    unique, seen = [], set()
+    unique, seen, used_ads = [], set(), set()
     for item in result:
-        if item.key in seen:
+        buy_ad, sell_ad = item.key[:2], item.key[2:]
+        if item.key in seen or (unique_ads and (buy_ad in used_ads or sell_ad in used_ads)):
             continue
         seen.add(item.key)
+        used_ads.update((buy_ad, sell_ad))
         unique.append(item)
         if len(unique) >= max_opportunities:
             break

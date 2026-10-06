@@ -3,6 +3,7 @@ import time
 
 import aiohttp
 
+from app import format as fmt
 from app.analyzer.arbitrage import ArbitrageOpportunity
 from app.http import request_json
 
@@ -10,19 +11,11 @@ log = logging.getLogger(__name__)
 
 
 def format_signal(x: ArbitrageOpportunity, fiat: str) -> str:
-    route = f"{x.buy.exchange} -> {x.sell.exchange}" if x.cross_exchange else x.buy.exchange
-    lines = [
-        f"P2P signal | {route} | score {x.score:.0f}",
-        f"Buy {x.buy.price:.2f} ({x.buy.merchant}) -> sell {x.sell.price:.2f} ({x.sell.merchant})",
-        f"Volume {x.amount:,.0f} {fiat} | spread {x.spread_percent:.2f}%",
-        f"Realistic profit {x.realistic_profit:,.2f} {fiat} ({x.realistic_profit_percent:.2f}%)",
-        f"Pay via {', '.join(x.buy_payment_methods)} | receive via {', '.join(x.sell_payment_methods)}",
-        f"Lock-up up to {x.lockup_minutes} min",
-    ]
-    if x.cross_exchange:
-        lines.append(f"Transfer fee {x.transfer_fee_usdt} USDT included")
-    lines.append("Check ad terms before trading. Not guaranteed profit.")
-    return "\n".join(lines)
+    return "\n".join([
+        f"🟢 +{fmt.money(x.realistic_profit, fiat)} ({x.realistic_profit_percent:.1f}%) {fmt.route(x)}",
+        f"{x.buy.price:.2f} → {x.sell.price:.2f} · {fmt.money(x.amount, fiat)} · {fmt.payment_route(x)}",
+        f"⏱ {x.lockup_minutes} мин · ⭐ {x.score:.0f}",
+    ])
 
 
 class TelegramNotifier:
