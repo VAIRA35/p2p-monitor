@@ -1,5 +1,12 @@
 # P2P Monitor
 
+> Монитор P2P-арбитража USDT/UAH на Binance, Bybit и OKX в реальном времени.
+> Real-time P2P arbitrage monitor (USDT/UAH) across Binance, Bybit and OKX.
+
+**Стек:** Python · asyncio / aiohttp · 3 биржевых API · SQLite · Telegram-бот · pytest (19 тестов)
+
+![demo](docs/demo.png)
+
 ## Назначение
 Консольный монитор P2P USDT/UAH на **Binance, Bybit, OKX**. Получает объявления, приводит их к общей модели,
 ищет потенциальный арбитраж (внутри биржи и между биржами), пишет историю в SQLite и может слать сигналы в Telegram.
